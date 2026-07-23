@@ -1,0 +1,5 @@
+.dreamers/
+dist/
+*~
+*.swp
+.DS_Store
