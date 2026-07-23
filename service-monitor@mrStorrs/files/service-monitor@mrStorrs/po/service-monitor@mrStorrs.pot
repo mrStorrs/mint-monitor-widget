@@ -1,0 +1,129 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: service-monitor@mrStorrs 1\n"
+"Report-Msgid-Bugs-To: https://github.com/mrStorrs/mint-monitor-widget/issues\n"
+"POT-Creation-Date: 2026-07-23 00:00-0700\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Service Monitor"
+msgstr ""
+
+msgid "No services configured"
+msgstr ""
+
+msgid "Open settings"
+msgstr ""
+
+msgid "Checking %d service…"
+msgstr ""
+
+msgid "Checking %d services…"
+msgstr ""
+
+msgid "All %d service healthy"
+msgstr ""
+
+msgid "All %d services healthy"
+msgstr ""
+
+msgid "%d of %d service needs attention"
+msgstr ""
+
+msgid "%d of %d services need attention"
+msgstr ""
+
+msgid "%d configuration entry was ignored."
+msgstr ""
+
+msgid "%d configuration entries were ignored."
+msgstr ""
+
+msgid "Open the journal for %s"
+msgstr ""
+
+msgid "Running"
+msgstr ""
+
+msgid "Starting"
+msgstr ""
+
+msgid "Reloading"
+msgstr ""
+
+msgid "Stopping"
+msgstr ""
+
+msgid "Failed"
+msgstr ""
+
+msgid "Stopped"
+msgstr ""
+
+msgid "Not found"
+msgstr ""
+
+msgid "Unavailable"
+msgstr ""
+
+msgid "Service needs attention"
+msgstr ""
+
+msgid "“%s” needs attention: %s."
+msgstr ""
+
+msgid "Service recovered"
+msgstr ""
+
+msgid "“%s” is running again."
+msgstr ""
+
+msgid "Journal command copied"
+msgstr ""
+
+msgid "Could not open a terminal for “%s”. The journal command was copied to the clipboard."
+msgstr ""
+
+msgid "Services"
+msgstr ""
+
+msgid "Choose the systemd services to monitor"
+msgstr ""
+
+msgid "Display name"
+msgstr ""
+
+msgid "Unit"
+msgstr ""
+
+msgid "User service"
+msgstr ""
+
+msgid "Refresh interval"
+msgstr ""
+
+msgid "seconds"
+msgstr ""
+
+msgid "Notify when a service fails or recovers"
+msgstr ""
+
+msgid "Appearance"
+msgstr ""
+
+msgid "Background color"
+msgstr ""
+
+msgid "Background transparency"
+msgstr ""
+
+msgid "Text size"
+msgstr ""
+
+msgid "pixels"
+msgstr ""

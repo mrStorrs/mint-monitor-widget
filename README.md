@@ -1,0 +1,51 @@
+# Mint Monitor Widget
+
+Mint Monitor Widget packages **Service Monitor**, a compact Cinnamon desklet for watching selected systemd services. It supports both system services and per-user services, reports failures and recoveries through Cinnamon notifications, and opens the relevant journal when a row is selected.
+
+## Features
+
+- Explicit watchlist with a display name, unit, and system/user scope.
+- Native asynchronous systemd D-Bus queries without parsing shell output.
+- Silent startup baseline followed by one notification per failure or recovery.
+- Text, shape, and color status cues in a compact desktop card.
+- Read-only operation with no privilege prompts or service controls.
+- Argument-safe journal launching in Cinnamon's configured terminal.
+
+## Requirements
+
+- Cinnamon 6.x.
+- A systemd-based Linux distribution.
+- `journalctl` for the row action.
+- Node.js, `make`, `zip`, and `unzip` only for development checks and packaging.
+
+## Install from source
+
+```bash
+make check
+make install-local
+```
+
+The install target copies the runtime payload into the current user's Cinnamon desklet directory and does not require root privileges. Then open **System Settings > Desklets**, add or reload **Service Monitor**, and use its settings to add services such as `ssh.service`. Check **User service** for units managed by `systemctl --user`; leave it unchecked for system services.
+
+The default watchlist is intentionally empty. No machine-specific service names are included in the repository.
+
+The first completed check, including the first check after changing the watchlist, establishes a silent baseline. If a running service later becomes failed, stopped, or missing, the desklet sends one notification; it sends one more when that service recovers. Query errors appear as **Unavailable** without creating a failure or recovery alert.
+
+## Development and packaging
+
+```bash
+make check
+make package
+```
+
+The archive is written to `dist/service-monitor@mrStorrs.zip`. The project keeps the [official Cinnamon desklet structure](https://github.com/linuxmint/cinnamon-spices-desklets#file-structure), so the top-level `service-monitor@mrStorrs/` directory can later be copied into the upstream repository.
+
+## Limits
+
+Service Monitor checks continuous `.service` units on the local machine every 2–300 seconds, with a default interval of 5 seconds. It does not monitor remote hosts, containers, HTTP endpoints, timer schedules, or whether the whole computer is offline. Because notifications are produced by the Cinnamon session, it cannot alert while that session or the whole computer is down. It does not start, stop, restart, enable, or disable services.
+
+For a general command-output widget, see [Command Result](https://cinnamon-spices.linuxmint.com/desklets/view/50). For network endpoint checks, see [Host Check](https://cinnamon-spices.linuxmint.com/desklets/view/49).
+
+## License
+
+GPL-2.0-or-later. See [LICENSE](LICENSE).

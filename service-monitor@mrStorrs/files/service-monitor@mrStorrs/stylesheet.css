@@ -1,0 +1,92 @@
+.service-monitor-card {
+    min-width: 300px;
+    padding: 16px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #f3f4f6;
+    spacing: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+}
+
+.service-monitor-heading {
+    padding-bottom: 6px;
+    spacing: 2px;
+}
+
+.service-monitor-title {
+    font-size: 1.15em;
+    font-weight: 700;
+}
+
+.service-monitor-summary {
+    color: rgba(243, 244, 246, 0.72);
+    font-size: 0.9em;
+}
+
+.service-monitor-summary-attention {
+    color: #fbbf24;
+}
+
+.service-monitor-row {
+    padding: 8px 9px;
+    border-radius: 9px;
+    background-color: rgba(255, 255, 255, 0.055);
+}
+
+.service-monitor-row:hover,
+.service-monitor-row:focus {
+    background-color: rgba(255, 255, 255, 0.12);
+}
+
+.service-monitor-row-content {
+    spacing: 9px;
+}
+
+.service-monitor-indicator {
+    width: 16px;
+    font-weight: 700;
+}
+
+.service-monitor-name {
+    color: #f9fafb;
+}
+
+.service-monitor-state {
+    color: rgba(243, 244, 246, 0.78);
+    font-size: 0.88em;
+}
+
+.service-monitor-healthy {
+    color: #4ade80;
+}
+
+.service-monitor-transitional {
+    color: #facc15;
+}
+
+.service-monitor-unhealthy,
+.service-monitor-missing {
+    color: #fb7185;
+}
+
+.service-monitor-unknown {
+    color: #a3a3a3;
+}
+
+.service-monitor-settings-button {
+    padding: 8px 12px;
+    border-radius: 8px;
+    background-color: rgba(96, 165, 250, 0.2);
+    color: #bfdbfe;
+}
+
+.service-monitor-settings-button:hover,
+.service-monitor-settings-button:focus {
+    background-color: rgba(96, 165, 250, 0.32);
+}
+
+.service-monitor-warning {
+    padding-top: 4px;
+    color: #fbbf24;
+    font-size: 0.82em;
+}
