@@ -4,7 +4,14 @@ const DEFAULT_POLL_INTERVAL = 5;
 const MIN_POLL_INTERVAL = 2;
 const MAX_POLL_INTERVAL = 300;
 const SERVICE_UNIT_PATTERN = /^[A-Za-z0-9:_.@-]+\.service$/;
-const STABLE_KINDS = new Set(["healthy", "unhealthy", "missing"]);
+const STABLE_KINDS = new Set([
+    "healthy",
+    "stopped",
+    "unhealthy",
+    "errored",
+    "missing"
+]);
+const FAILURE_KINDS = new Set(["stopped", "unhealthy", "errored", "missing"]);
 
 function isValidServiceUnit(unit) {
     return typeof unit === "string" && SERVICE_UNIT_PATTERN.test(unit);
@@ -90,6 +97,9 @@ function classifyUnit(tuple) {
     if (loadState === "not-found") {
         kind = "missing";
         label = "Not found";
+    } else if (loadState === "error") {
+        kind = "errored";
+        label = "Unavailable";
     } else if (loadState !== "loaded") {
         return unavailableState();
     } else if (activeState === "active") {
@@ -108,7 +118,7 @@ function classifyUnit(tuple) {
         kind = "unhealthy";
         label = "Failed";
     } else if (activeState === "inactive") {
-        kind = "unhealthy";
+        kind = "stopped";
         label = "Stopped";
     }
 
@@ -189,17 +199,17 @@ class TransitionTracker {
                 continue;
 
             const previous = this._stableStates.get(row.key);
-            const wasUnhealthy = previous === "unhealthy" || previous === "missing";
-            const isUnhealthy = current === "unhealthy" || current === "missing";
+            const wasFailure = FAILURE_KINDS.has(previous);
+            const isFailure = FAILURE_KINDS.has(current);
 
-            if (previous === "healthy" && isUnhealthy) {
+            if (previous === "healthy" && isFailure) {
                 events.push({
                     key: row.key,
                     type: "failure",
                     from: previous,
                     to: current
                 });
-            } else if (wasUnhealthy && current === "healthy") {
+            } else if (wasFailure && current === "healthy") {
                 events.push({
                     key: row.key,
                     type: "recovery",

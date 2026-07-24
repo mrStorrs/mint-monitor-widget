@@ -7,7 +7,7 @@ Mint Monitor Widget packages **Service Monitor**, a compact Cinnamon desklet for
 - Explicit watchlist with a display name, unit, and system/user scope.
 - Native asynchronous systemd D-Bus queries without parsing shell output.
 - Silent startup baseline followed by one notification per failure or recovery.
-- Text, shape, and color status cues in a compact desktop card.
+- Text, shape, and color status cues in a compact desktop card: stopped rows are yellow, failed rows and systemd load errors are red, and missing or unavailable rows stay neutral.
 - Read-only operation with no privilege prompts or service controls.
 - Argument-safe journal launching with configurable history in Cinnamon's configured terminal.
 
@@ -30,6 +30,8 @@ The install target copies the runtime payload into the current user's Cinnamon d
 The default watchlist is intentionally empty. No machine-specific service names are included in the repository.
 
 The first completed check, including the first check after changing the watchlist, establishes a silent baseline. If a running service later becomes failed, stopped, or missing, the desklet sends one notification; it sends one more when that service recovers. Query errors appear as **Unavailable** without creating a failure or recovery alert.
+
+Stopped rows render yellow, failed rows and systemd load errors render red, and missing or unavailable rows remain neutral. Text still carries the state meaning, so the color is a cue rather than the only signal.
 
 Selecting a service opens its journal and follows new entries. **Journal history lines** defaults to 1,000 and accepts values from 1 through 100,000. Changes apply the next time a service row is selected; they do not alter an already-open journal terminal.
 
