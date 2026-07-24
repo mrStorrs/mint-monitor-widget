@@ -104,11 +104,67 @@ test("AC2 refreshes each bus once and restores configured row order", async () =
     assert.deepEqual(
         renders.at(-1).rows.map(row => [row.label, row.scope, row.state.kind]),
         [
-            ["Sync worker", "user", "unhealthy"],
+            ["Sync worker", "user", "stopped"],
             ["Model worker", "system", "healthy"]
         ]
     );
     assert.equal(renders.at(-1).ignoredCount, 1);
+});
+
+test("status stylesheet reserves red for failed and errored services", () => {
+    const stylesheet = fs.readFileSync(
+        path.join(PAYLOAD, "stylesheet.css"),
+        "utf8"
+    );
+
+    assert.match(
+        stylesheet,
+        /\.service-monitor-transitional,\s*\.service-monitor-stopped\s*\{\s*color:\s*#facc15;/
+    );
+    assert.match(
+        stylesheet,
+        /\.service-monitor-unhealthy,\s*\.service-monitor-errored\s*\{\s*color:\s*#fb7185;/
+    );
+    assert.match(
+        stylesheet,
+        /\.service-monitor-missing,\s*\.service-monitor-unknown\s*\{\s*color:\s*#a3a3a3;/
+    );
+    assert.doesNotMatch(stylesheet, /\.service-monitor-unhealthy,\s*\.service-monitor-missing/);
+});
+
+test("status changes preserve summary attention across mixed states", async () => {
+    const renders = [];
+    const core = new desklet.ServiceMonitorCore({
+        query: async scope => {
+            if (scope === "user")
+                throw new Error("user bus unavailable");
+
+            return [
+                systemdTuple("stopped.service", "inactive", "loaded", "dead"),
+                systemdTuple("failed.service", "failed", "loaded", "failed"),
+                systemdTuple("errored.service", "active", "error", "failed"),
+                systemdTuple("missing.service", "inactive", "not-found", "dead")
+            ];
+        },
+        render: view => renders.push(view),
+        notify: () => {}
+    });
+
+    core.setWatchlist([
+        {label: "Stopped", unit: "stopped.service", scope: "system"},
+        {label: "Failed", unit: "failed.service", scope: "system"},
+        {label: "Errored", unit: "errored.service", scope: "system"},
+        {label: "Missing", unit: "missing.service", scope: "system"},
+        {label: "Unavailable", unit: "unavailable.service", scope: "user"}
+    ]);
+    await core.refresh();
+
+    const view = renders.at(-1);
+    assert.deepEqual(
+        view.rows.map(row => row.state.kind),
+        ["stopped", "unhealthy", "errored", "missing", "unknown"]
+    );
+    assert.equal(view.summary.attention, 5);
 });
 
 test("AC7 prevents overlapping refreshes and ignores completion after removal", async () => {
