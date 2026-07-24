@@ -1,6 +1,6 @@
 msgid ""
 msgstr ""
-"Project-Id-Version: service-monitor@mrStorrs 1\n"
+"Project-Id-Version: service-monitor@mrStorrs 2\n"
 "Report-Msgid-Bugs-To: https://github.com/mrStorrs/mint-monitor-widget/issues\n"
 "POT-Creation-Date: 2026-07-23 00:00-0700\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
@@ -111,6 +111,12 @@ msgid "seconds"
 msgstr ""
 
 msgid "Notify when a service fails or recovers"
+msgstr ""
+
+msgid "Journal history lines"
+msgstr ""
+
+msgid "lines"
 msgstr ""
 
 msgid "Appearance"

@@ -3,6 +3,9 @@
 const ServiceState = require("./serviceState.js");
 const IS_NODE = typeof imports === "undefined";
 const UUID = "service-monitor@mrStorrs";
+const DEFAULT_JOURNAL_LINES = 1000;
+const MIN_JOURNAL_LINES = 1;
+const MAX_JOURNAL_LINES = 100000;
 
 let Clutter;
 let Desklet;
@@ -205,7 +208,24 @@ class ServiceMonitorCore {
     }
 }
 
-function journalArguments(entry) {
+function normalizeJournalLines(value) {
+    const isNumber = typeof value === "number";
+    const isDecimalString = typeof value === "string"
+        && /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(value.trim());
+    if (!isNumber && !isDecimalString)
+        return DEFAULT_JOURNAL_LINES;
+
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue))
+        return DEFAULT_JOURNAL_LINES;
+
+    return Math.min(
+        MAX_JOURNAL_LINES,
+        Math.max(MIN_JOURNAL_LINES, Math.round(numericValue))
+    );
+}
+
+function journalArguments(entry, journalLines = DEFAULT_JOURNAL_LINES) {
     if (!ServiceState.isValidServiceUnit(entry.unit))
         throw new Error(`Invalid service unit: ${entry.unit}`);
     if (entry.scope !== "system" && entry.scope !== "user")
@@ -214,12 +234,24 @@ function journalArguments(entry) {
     const args = ["journalctl"];
     if (entry.scope === "user")
         args.push("--user");
-    args.push("--unit", entry.unit, "--lines", "100", "--follow");
+    args.push(
+        "--unit",
+        entry.unit,
+        "--lines",
+        String(normalizeJournalLines(journalLines)),
+        "--follow"
+    );
     return args;
 }
 
-function launchJournal(entry, terminalArgv, terminalExecArgv, adapters) {
-    const journalArgv = journalArguments(entry);
+function launchJournal(
+    entry,
+    terminalArgv,
+    terminalExecArgv,
+    adapters,
+    journalLines = DEFAULT_JOURNAL_LINES
+) {
+    const journalArgv = journalArguments(entry, journalLines);
     const command = journalArgv.join(" ");
 
     try {
@@ -307,6 +339,7 @@ if (!IS_NODE) {
             this.services = [];
             this.refreshInterval = 5;
             this.showNotifications = true;
+            this.journalLines = DEFAULT_JOURNAL_LINES;
             this.backgroundColor = "rgb(31,36,43)";
             this.backgroundTransparency = 0.08;
             this.textSize = 14;
@@ -336,6 +369,10 @@ if (!IS_NODE) {
             this._settings.bind(
                 "show-notifications",
                 "showNotifications"
+            );
+            this._settings.bind(
+                "journal-lines",
+                "journalLines"
             );
             this._settings.bind(
                 "background-color",
@@ -606,31 +643,37 @@ if (!IS_NODE) {
                 terminalExecArgv = [];
             }
 
-            launchJournal(entry, terminalArgv, terminalExecArgv, {
-                spawn: argv => {
-                    const launcher = Gio.SubprocessLauncher.new(
-                        Gio.SubprocessFlags.NONE
-                    );
-                    launcher.spawnv(argv);
+            launchJournal(
+                entry,
+                terminalArgv,
+                terminalExecArgv,
+                {
+                    spawn: argv => {
+                        const launcher = Gio.SubprocessLauncher.new(
+                            Gio.SubprocessFlags.NONE
+                        );
+                        launcher.spawnv(argv);
+                    },
+                    copy: command => {
+                        St.Clipboard.get_default().set_text(
+                            St.ClipboardType.CLIPBOARD,
+                            command
+                        );
+                    },
+                    notifyFallback: failedEntry => {
+                        Main.notify(
+                            translate("Journal command copied"),
+                            formatText(
+                                translate(
+                                    "Could not open a terminal for \u201c%s\u201d. The journal command was copied to the clipboard."
+                                ),
+                                failedEntry.label
+                            )
+                        );
+                    }
                 },
-                copy: command => {
-                    St.Clipboard.get_default().set_text(
-                        St.ClipboardType.CLIPBOARD,
-                        command
-                    );
-                },
-                notifyFallback: failedEntry => {
-                    Main.notify(
-                        translate("Journal command copied"),
-                        formatText(
-                            translate(
-                                "Could not open a terminal for \u201c%s\u201d. The journal command was copied to the clipboard."
-                            ),
-                            failedEntry.label
-                        )
-                    );
-                }
-            });
+                this.journalLines
+            );
         }
 
         _applyAppearance() {
