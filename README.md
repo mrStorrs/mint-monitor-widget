@@ -9,7 +9,7 @@ Mint Monitor Widget packages **Service Monitor**, a compact Cinnamon desklet for
 - Silent startup baseline followed by one notification per failure or recovery.
 - Text, shape, and color status cues in a compact desktop card.
 - Read-only operation with no privilege prompts or service controls.
-- Argument-safe journal launching in Cinnamon's configured terminal.
+- Argument-safe journal launching with configurable history in Cinnamon's configured terminal.
 
 ## Requirements
 
@@ -31,6 +31,8 @@ The default watchlist is intentionally empty. No machine-specific service names 
 
 The first completed check, including the first check after changing the watchlist, establishes a silent baseline. If a running service later becomes failed, stopped, or missing, the desklet sends one notification; it sends one more when that service recovers. Query errors appear as **Unavailable** without creating a failure or recovery alert.
 
+Selecting a service opens its journal and follows new entries. **Journal history lines** defaults to 1,000 and accepts values from 1 through 100,000. Changes apply the next time a service row is selected; they do not alter an already-open journal terminal.
+
 ## Development and packaging
 
 ```bash
@@ -43,6 +45,8 @@ The archive is written to `dist/service-monitor@mrStorrs.zip`. The project keeps
 ## Limits
 
 Service Monitor checks continuous `.service` units on the local machine every 2–300 seconds, with a default interval of 5 seconds. It does not monitor remote hosts, containers, HTTP endpoints, timer schedules, or whether the whole computer is offline. Because notifications are produced by the Cinnamon session, it cannot alert while that session or the whole computer is down. It does not start, stop, restart, enable, or disable services.
+
+Large journal-history values can make noisy services slower to open and increase terminal memory use. The setting changes only how much retained history `journalctl` initially displays; it does not change journal retention or terminal scrollback limits.
 
 For a general command-output widget, see [Command Result](https://cinnamon-spices.linuxmint.com/desklets/view/50). For network endpoint checks, see [Host Check](https://cinnamon-spices.linuxmint.com/desklets/view/49).
 

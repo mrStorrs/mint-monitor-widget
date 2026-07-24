@@ -269,7 +269,7 @@ test("AC6 forwards exactly-once core events and honors the notification toggle",
     assert.equal(notifications.length, 2);
 });
 
-test("AC8 launches journalctl with argument-safe user and system argv", () => {
+test("journal AC1 and AC2 launch with default and exact custom line counts", () => {
     const spawned = [];
     const adapters = {
         spawn: argv => spawned.push(argv),
@@ -291,7 +291,8 @@ test("AC8 launches journalctl with argument-safe user and system argv", () => {
             {label: "Model worker", unit: "model-worker.service", scope: "system"},
             ["kitty"],
             ["--"],
-            adapters
+            adapters,
+            100000
         ),
         true
     );
@@ -304,7 +305,7 @@ test("AC8 launches journalctl with argument-safe user and system argv", () => {
             "--unit",
             "sync-worker.service",
             "--lines",
-            "100",
+            "1000",
             "--follow"
         ],
         [
@@ -314,13 +315,56 @@ test("AC8 launches journalctl with argument-safe user and system argv", () => {
             "--unit",
             "model-worker.service",
             "--lines",
-            "100",
+            "100000",
             "--follow"
         ]
     ]);
 });
 
-test("AC8 copies the exact command and notifies when terminal launch fails", () => {
+test("journal AC3 normalizes malformed and out-of-range line counts", () => {
+    const cases = [
+        [-10, "1"],
+        [0, "1"],
+        [1, "1"],
+        [42.4, "42"],
+        [42.5, "43"],
+        [100000, "100000"],
+        [100001, "100000"],
+        ["2501", "2501"],
+        [false, "1000"],
+        [true, "1000"],
+        [[], "1000"],
+        [[2501], "1000"],
+        [{value: 2501}, "1000"],
+        ["", "1000"],
+        [null, "1000"],
+        [Number.NaN, "1000"],
+        [Number.POSITIVE_INFINITY, "1000"],
+        ["not-a-number", "1000"]
+    ];
+
+    for (const [configured, expected] of cases) {
+        const spawned = [];
+        assert.equal(
+            desklet.launchJournal(
+                {label: "Worker", unit: "worker.service", scope: "system"},
+                ["kitty"],
+                ["--"],
+                {
+                    spawn: argv => spawned.push(argv),
+                    copy: () => assert.fail("clipboard fallback was not expected"),
+                    notifyFallback: () => assert.fail("fallback notification was not expected")
+                },
+                configured
+            ),
+            true
+        );
+        const lineIndex = spawned[0].indexOf("--lines");
+        assert.equal(spawned[0][lineIndex + 1], expected, String(configured));
+    }
+});
+
+test("journal AC4 copies the exact custom command and notifies on launch failure", () => {
     const copied = [];
     const notifications = [];
     const result = desklet.launchJournal(
@@ -333,12 +377,13 @@ test("AC8 copies the exact command and notifies when terminal launch fails", () 
             },
             copy: text => copied.push(text),
             notifyFallback: entry => notifications.push(entry)
-        }
+        },
+        100001
     );
 
     assert.equal(result, false);
     assert.deepEqual(copied, [
-        "journalctl --user --unit sync-worker.service --lines 100 --follow"
+        "journalctl --user --unit sync-worker.service --lines 100000 --follow"
     ]);
     assert.deepEqual(notifications, [
         {label: "Sync worker", unit: "sync-worker.service", scope: "user"}
@@ -394,16 +439,44 @@ test("AC10 includes an upstream-shaped, internally consistent Spice payload", ()
     assert.equal(info.author, "mrStorrs");
     assert.equal(metadata.uuid, UUID);
     assert.equal(metadata.name, "Service Monitor");
+    assert.equal(metadata.version, 2);
     assert.equal(metadata["max-instances"], 10);
     assert.deepEqual(settings.services.default, []);
     assert.equal(settings["refresh-interval"].default, 5);
     assert.equal(settings["show-notifications"].default, true);
+    assert.deepEqual(
+        settings["journal-lines"],
+        {
+            type: "spinbutton",
+            default: 1000,
+            min: 1,
+            max: 100000,
+            step: 100,
+            units: "lines",
+            description: "Journal history lines"
+        }
+    );
     assert.equal(settings.services.type, "list");
     assert.deepEqual(
         settings.services.columns.map(column => column.id),
         ["label", "unit", "user"]
     );
     assert.equal(settings.services.columns[2].type, "boolean");
+
+    const pot = fs.readFileSync(
+        path.join(PAYLOAD, "po", `${UUID}.pot`),
+        "utf8"
+    );
+    assert.match(pot, /Project-Id-Version: service-monitor@mrStorrs 2/);
+    assert.match(pot, /msgid "Journal history lines"/);
+    assert.match(pot, /msgid "lines"/);
+
+    const projectReadme = fs.readFileSync(path.join(ROOT, "README.md"), "utf8");
+    const catalogReadme = fs.readFileSync(path.join(SPICE_ROOT, "README.md"), "utf8");
+    assert.match(projectReadme, /1,000/);
+    assert.match(projectReadme, /100,000/);
+    assert.match(catalogReadme, /1,000/);
+    assert.match(catalogReadme, /100,000/);
 });
 
 test("AC10 keeps runtime code asynchronous and free of shell/systemctl calls", () => {
