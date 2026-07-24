@@ -1,6 +1,6 @@
 # Mint Monitor Widget
 
-Mint Monitor Widget packages **Service Monitor**, a compact Cinnamon desklet for watching selected systemd services. It supports both system services and per-user services, reports failures and recoveries through Cinnamon notifications, and opens the relevant journal when a row is selected.
+Mint Monitor Widget packages **Service Monitor**, a compact Cinnamon desklet for watching and controlling selected systemd services. It supports both system services and per-user services, reports failures and recoveries through Cinnamon notifications, opens the relevant journal when a row is selected, and offers Start/Stop actions from each row's right-click menu.
 
 ## Features
 
@@ -8,7 +8,7 @@ Mint Monitor Widget packages **Service Monitor**, a compact Cinnamon desklet for
 - Native asynchronous systemd D-Bus queries without parsing shell output.
 - Silent startup baseline followed by one notification per failure or recovery.
 - Text, shape, and color status cues in a compact desktop card.
-- Read-only operation with no privilege prompts or service controls.
+- Native Start/Stop controls through asynchronous systemd D-Bus calls.
 - Argument-safe journal launching with configurable history in Cinnamon's configured terminal.
 
 ## Requirements
@@ -25,9 +25,11 @@ make check
 make install-local
 ```
 
-The install target copies the runtime payload into the current user's Cinnamon desklet directory and does not require root privileges. Then open **System Settings > Desklets**, add or reload **Service Monitor**, and use its settings to add services such as `ssh.service`. Check **User service** for units managed by `systemctl --user`; leave it unchecked for system services.
+The install target copies the runtime payload into the current user's Cinnamon desklet directory and does not require root privileges. Then open **System Settings > Desklets**, add or reload **Service Monitor**, and use its settings to edit the watchlist. New settings instances include a user-scoped `minecraft-server.service` row; remove it if the companion service is not installed. Check **User service** for units managed by `systemctl --user`; leave it unchecked for system services.
 
-The default watchlist is intentionally empty. No machine-specific service names are included in the repository.
+Right-click a service row for **Start** and **Stop**. The available action follows the last known state; unknown or missing units cannot be changed. System-scoped actions may require the normal systemd authorization prompt. Action failures are shown as Cinnamon notifications.
+
+The Minecraft companion files live separately in `~/projects/games/minecraft/service` so the public Spice does not contain a machine-specific launcher path. Install that user service with the local installer in that directory, passing the directory that contains the `run.sh` targeted by your `minecraft-server` alias. Installation does not enable or start it at login; start it manually from the desklet or with `systemctl --user start minecraft-server.service` when wanted. Its stop handler sends the Minecraft `stop` console command and waits for the server to exit so the world can save; after 120 seconds, systemd hard-kills any remaining service processes as the final fallback.
 
 The first completed check, including the first check after changing the watchlist, establishes a silent baseline. If a running service later becomes failed, stopped, or missing, the desklet sends one notification; it sends one more when that service recovers. Query errors appear as **Unavailable** without creating a failure or recovery alert.
 
@@ -44,7 +46,7 @@ The archive is written to `dist/service-monitor@mrStorrs.zip`. The project keeps
 
 ## Limits
 
-Service Monitor checks continuous `.service` units on the local machine every 2–300 seconds, with a default interval of 5 seconds. It does not monitor remote hosts, containers, HTTP endpoints, timer schedules, or whether the whole computer is offline. Because notifications are produced by the Cinnamon session, it cannot alert while that session or the whole computer is down. It does not start, stop, restart, enable, or disable services.
+Service Monitor checks continuous `.service` units on the local machine every 2–300 seconds, with a default interval of 5 seconds. It does not monitor remote hosts, containers, HTTP endpoints, timer schedules, or whether the whole computer is offline. Because notifications are produced by the Cinnamon session, it cannot alert while that session or the whole computer is down. It does not restart, enable, disable, mask, or edit services.
 
 Large journal-history values can make noisy services slower to open and increase terminal memory use. The setting changes only how much retained history `journalctl` initially displays; it does not change journal retention or terminal scrollback limits.
 

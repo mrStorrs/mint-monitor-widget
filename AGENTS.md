@@ -18,8 +18,8 @@ Desktop behavior involving Cinnamon, systemd D-Bus, notifications, and terminal 
 
 ## Hard rules
 
-- Keep the desklet read-only. Never add service start, stop, restart, enable, or disable operations.
-- Use the systemd D-Bus API asynchronously; do not parse `systemctl` output.
+- Use the systemd D-Bus API asynchronously for monitoring and the supported Start/Stop row actions; do not parse `systemctl` output.
+- Do not add restart, enable, disable, mask, unmask, or edit-unit operations.
 - Launch external programs with argument arrays, never a shell command.
 - Keep user-visible strings translatable and status meaning available through text, not color alone.
 - Do not commit personal service names, settings, logs, or machine-specific paths.

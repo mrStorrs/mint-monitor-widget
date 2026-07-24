@@ -24,7 +24,13 @@
                 "default": false
             }
         ],
-        "default": []
+        "default": [
+            {
+                "label": "Minecraft Server",
+                "unit": "minecraft-server.service",
+                "user": true
+            }
+        ]
     },
     "refresh-interval": {
         "type": "spinbutton",
