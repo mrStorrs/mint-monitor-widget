@@ -2,7 +2,7 @@
     "uuid": "service-monitor@mrStorrs",
     "name": "Service Monitor",
     "description": "Monitor selected system and user systemd services from the Cinnamon desktop.",
-    "version": 2,
+    "version": 3,
     "max-instances": 10,
     "prevent-decorations": true
 }

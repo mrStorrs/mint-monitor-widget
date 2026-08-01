@@ -1,6 +1,6 @@
 msgid ""
 msgstr ""
-"Project-Id-Version: service-monitor@mrStorrs 2\n"
+"Project-Id-Version: service-monitor@mrStorrs 3\n"
 "Report-Msgid-Bugs-To: https://github.com/mrStorrs/mint-monitor-widget/issues\n"
 "POT-Creation-Date: 2026-07-23 00:00-0700\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
@@ -69,6 +69,27 @@ msgid "Not found"
 msgstr ""
 
 msgid "Unavailable"
+msgstr ""
+
+msgid "Start"
+msgstr ""
+
+msgid "Stop"
+msgstr ""
+
+msgid "Minecraft Server"
+msgstr ""
+
+msgid "start"
+msgstr ""
+
+msgid "stop"
+msgstr ""
+
+msgid "Service action failed"
+msgstr ""
+
+msgid "Could not %s “%s”."
 msgstr ""
 
 msgid "Service needs attention"

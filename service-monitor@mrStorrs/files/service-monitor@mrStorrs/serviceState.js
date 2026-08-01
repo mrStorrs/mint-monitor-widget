@@ -84,6 +84,25 @@ function unavailableState() {
     };
 }
 
+function serviceActionAvailability(state) {
+    if (!state || state.loadState !== "loaded") {
+        return {
+            canStart: false,
+            canStop: false
+        };
+    }
+
+    return {
+        canStart: state.activeState === "inactive" || state.activeState === "failed",
+        canStop: [
+            "active",
+            "activating",
+            "reloading",
+            "deactivating"
+        ].includes(state.activeState)
+    };
+}
+
 function classifyUnit(tuple) {
     if (!Array.isArray(tuple) || tuple.length < 5)
         return unavailableState();
@@ -232,6 +251,7 @@ module.exports = {
     groupEntriesByScope,
     isValidServiceUnit,
     normalizeWatchlist,
+    serviceActionAvailability,
     summarizeStates,
     unavailableState
 };

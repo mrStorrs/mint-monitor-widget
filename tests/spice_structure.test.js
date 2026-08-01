@@ -275,6 +275,38 @@ test("AC5 and AC7 queue a replacement watchlist without overlapping polls", asyn
     assert.equal(notifications.length, 0);
 });
 
+test("action-triggered refreshes queue behind an in-flight poll", async () => {
+    const firstPoll = deferred();
+    const secondPoll = deferred();
+    const queries = [];
+    const renders = [];
+    const core = new desklet.ServiceMonitorCore({
+        query: () => {
+            queries.push(queries.length + 1);
+            return queries.length === 1 ? firstPoll.promise : secondPoll.promise;
+        },
+        render: view => renders.push(view),
+        notify: () => {}
+    });
+
+    core.setWatchlist([
+        {label: "Worker", unit: "worker.service", scope: "system"}
+    ]);
+    const firstRefresh = core.refresh();
+    assert.equal(await core.refresh(), false);
+    assert.deepEqual(queries, [1]);
+
+    firstPoll.resolve([systemdTuple("worker.service", "active")]);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(queries, [1, 2]);
+    secondPoll.resolve([systemdTuple("worker.service", "inactive", "loaded", "dead")]);
+    await firstRefresh;
+    assert.deepEqual(queries, [1, 2]);
+    assert.equal(renders.at(-1).rows[0].unit, "worker.service");
+    assert.equal(renders.at(-1).rows[0].state.kind, "stopped");
+    assert.equal(renders.at(-1).summary.kind, "attention");
+});
+
 test("AC6 forwards exactly-once core events and honors the notification toggle", async () => {
     const notifications = [];
     let enabled = true;
@@ -446,6 +478,98 @@ test("journal AC4 copies the exact custom command and notifies on launch failure
     ]);
 });
 
+test("service actions use validated D-Bus method names and replace mode", () => {
+    assert.deepEqual(
+        desklet.serviceActionRequest("start", "worker.service"),
+        {method: "StartUnit", args: ["worker.service", "replace"]}
+    );
+    assert.deepEqual(
+        desklet.serviceActionRequest("stop", "worker.service"),
+        {method: "StopUnit", args: ["worker.service", "replace"]}
+    );
+    assert.throws(
+        () => desklet.serviceActionRequest("restart", "worker.service"),
+        /Invalid service action/
+    );
+    assert.throws(
+        () => desklet.serviceActionRequest("start", "bad;touch.service"),
+        /Invalid service unit/
+    );
+});
+
+test("service action orchestration covers scope, duplicates, errors, retry, and removal", async () => {
+    const row = {
+        key: "user:worker.service",
+        unit: "worker.service",
+        scope: "user",
+        state: {loadState: "loaded", activeState: "inactive"}
+    };
+    const secondRow = {
+        ...row,
+        key: "system:other.service",
+        unit: "other.service",
+        scope: "system"
+    };
+    const inFlight = new Set();
+    const calls = [];
+    const refreshes = [];
+    const failures = [];
+    let removed = false;
+    const pending = deferred();
+    const adapters = {
+        removed: () => removed,
+        inFlight,
+        call: (scope, action, unit) => {
+            calls.push({scope, action, unit});
+            return pending.promise;
+        },
+        refresh: () => {
+            refreshes.push(true);
+            return Promise.resolve(true);
+        },
+        notifyFailure: (failedRow, action) => failures.push([failedRow.key, action])
+    };
+
+    const first = desklet.runServiceAction(row, "start", adapters);
+    assert.equal(inFlight.has(row.key), true);
+    assert.equal(
+        await desklet.runServiceAction(row, "start", adapters),
+        false
+    );
+    const second = desklet.runServiceAction(secondRow, "start", adapters);
+    pending.resolve("job");
+    assert.equal(await first, true);
+    assert.equal(await second, true);
+    assert.deepEqual(calls[0], {scope: "user", action: "start", unit: "worker.service"});
+    assert.deepEqual(calls[1], {scope: "system", action: "start", unit: "other.service"});
+    assert.equal(refreshes.length, 2);
+    assert.equal(inFlight.size, 0);
+
+    const callCountBeforeUnavailable = calls.length;
+    assert.equal(
+        await desklet.runServiceAction({
+            ...row,
+            key: "user:missing.service",
+            unit: "missing.service",
+            state: {loadState: "not-found", activeState: "inactive"}
+        }, "start", adapters),
+        false
+    );
+    assert.equal(calls.length, callCountBeforeUnavailable);
+
+    adapters.call = () => Promise.reject(new Error("denied"));
+    assert.equal(await desklet.runServiceAction(row, "start", adapters), false);
+    assert.deepEqual(failures, [[row.key, "start"]]);
+
+    const late = deferred();
+    adapters.call = () => late.promise;
+    const removedAction = desklet.runServiceAction(row, "start", adapters);
+    removed = true;
+    late.reject(new Error("removed"));
+    assert.equal(await removedAction, false);
+    assert.deepEqual(failures, [[row.key, "start"]]);
+});
+
 test("AC8 rejects an unsafe unit before attempting a launch", () => {
     let spawnCalled = false;
     assert.throws(
@@ -495,9 +619,15 @@ test("AC10 includes an upstream-shaped, internally consistent Spice payload", ()
     assert.equal(info.author, "mrStorrs");
     assert.equal(metadata.uuid, UUID);
     assert.equal(metadata.name, "Service Monitor");
-    assert.equal(metadata.version, 2);
+    assert.equal(metadata.version, 3);
     assert.equal(metadata["max-instances"], 10);
-    assert.deepEqual(settings.services.default, []);
+    assert.deepEqual(settings.services.default, [
+        {
+            label: "Minecraft Server",
+            unit: "minecraft-server.service",
+            user: true
+        }
+    ]);
     assert.equal(settings["refresh-interval"].default, 5);
     assert.equal(settings["show-notifications"].default, true);
     assert.deepEqual(
@@ -523,9 +653,11 @@ test("AC10 includes an upstream-shaped, internally consistent Spice payload", ()
         path.join(PAYLOAD, "po", `${UUID}.pot`),
         "utf8"
     );
-    assert.match(pot, /Project-Id-Version: service-monitor@mrStorrs 2/);
+    assert.match(pot, /Project-Id-Version: service-monitor@mrStorrs 3/);
     assert.match(pot, /msgid "Journal history lines"/);
     assert.match(pot, /msgid "lines"/);
+    assert.match(pot, /msgid "Start"/);
+    assert.match(pot, /msgid "Stop"/);
 
     const projectReadme = fs.readFileSync(path.join(ROOT, "README.md"), "utf8");
     const catalogReadme = fs.readFileSync(path.join(SPICE_ROOT, "README.md"), "utf8");
@@ -549,8 +681,47 @@ test("AC10 keeps runtime code asynchronous and free of shell/systemctl calls", (
         assert.equal(source.includes(token), false, token);
 
     assert.match(source, /ListUnitsByNames/);
+    assert.match(source, /StartUnit/);
+    assert.match(source, /StopUnit/);
+    assert.match(source, /new GLib\.Variant\("\(ss\)"/);
+    assert.match(source, /ALLOW_INTERACTIVE_AUTHORIZATION/);
+    assert.match(source, /BUTTON_SECONDARY/);
     assert.match(source, /new_for_bus/);
     assert.match(source, /Gio\.SubprocessLauncher/);
+});
+
+test("Minecraft companion files stay outside the Spice payload", () => {
+    const serviceRoot = process.env.MINT_MONITOR_MINECRAFT_SERVICE_ROOT;
+    if (!serviceRoot) {
+        console.log("ok - Minecraft companion files stay outside the Spice payload (local companion not configured)");
+        return;
+    }
+    if (!fs.existsSync(serviceRoot)) {
+        console.log("ok - Minecraft companion files stay outside the Spice payload (configured path not present)");
+        return;
+    }
+
+    for (const filename of [
+        "README.md",
+        "install.sh",
+        "test-install.sh",
+        "test-wrapper.sh",
+        "minecraft-server.service",
+        "minecraft-server-wrapper.sh"
+    ])
+        assert.equal(fs.existsSync(path.join(serviceRoot, filename)), true, filename);
+
+    const unitSource = fs.readFileSync(
+        path.join(serviceRoot, "minecraft-server.service"),
+        "utf8"
+    );
+    assert.match(unitSource, /KillMode=mixed/);
+    assert.match(unitSource, /TimeoutStopSec=120/);
+    assert.match(unitSource, /SendSIGKILL=yes/);
+    assert.match(unitSource, /FinalKillSignal=SIGKILL/);
+
+    assert.ok(!fs.existsSync(path.join(PAYLOAD, "minecraft-server.service")));
+    assert.ok(!fs.existsSync(path.join(PAYLOAD, "minecraft-server-wrapper.sh")));
 });
 
 test("AC10 packages only the UUID directory at the archive root", () => {
@@ -571,6 +742,14 @@ test("AC10 packages only the UUID directory at the archive root", () => {
     assert.ok(entries.every(entry => entry.startsWith(`${UUID}/`)));
     assert.ok(entries.every(entry => !entry.includes(".dreamers")));
     assert.ok(entries.every(entry => !entry.startsWith("tests/")));
+    for (const companionName of [
+        "minecraft-server.service",
+        "minecraft-server-wrapper.sh",
+        "install.sh",
+        "test-install.sh",
+        "test-wrapper.sh"
+    ])
+        assert.ok(entries.every(entry => !entry.endsWith(`/${companionName}`)), companionName);
 });
 
 test("AC11 provides a catalog screenshot captured at desktop scale", () => {

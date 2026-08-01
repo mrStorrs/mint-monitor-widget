@@ -283,5 +283,24 @@ test("poll interval clamps to the supported 2 to 300 second range", () => {
     assert.equal(state.clampPollInterval("bad"), 5);
 });
 
+test("lifecycle actions follow the classified loaded service state", () => {
+    const cases = [
+        [{loadState: "loaded", activeState: "active"}, {canStart: false, canStop: true}],
+        [{loadState: "loaded", activeState: "activating"}, {canStart: false, canStop: true}],
+        [{loadState: "loaded", activeState: "reloading"}, {canStart: false, canStop: true}],
+        [{loadState: "loaded", activeState: "deactivating"}, {canStart: false, canStop: true}],
+        [{loadState: "loaded", activeState: "failed"}, {canStart: true, canStop: false}],
+        [{loadState: "loaded", activeState: "inactive"}, {canStart: true, canStop: false}],
+        [{loadState: "loaded", activeState: "unknown"}, {canStart: false, canStop: false}],
+        [{loadState: "not-found", activeState: "inactive"}, {canStart: false, canStop: false}],
+        [{loadState: "error", activeState: "active"}, {canStart: false, canStop: false}],
+        [null, {canStart: false, canStop: false}],
+        [{}, {canStart: false, canStop: false}]
+    ];
+
+    for (const [input, expected] of cases)
+        assert.deepEqual(state.serviceActionAvailability(input), expected);
+});
+
 if (failures > 0)
     process.exitCode = 1;
