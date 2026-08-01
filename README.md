@@ -7,7 +7,7 @@ Mint Monitor Widget packages **Service Monitor**, a compact Cinnamon desklet for
 - Explicit watchlist with a display name, unit, and system/user scope.
 - Native asynchronous systemd D-Bus queries without parsing shell output.
 - Silent startup baseline followed by one notification per failure or recovery.
-- Text, shape, and color status cues in a compact desktop card.
+- Text, shape, and color status cues in a compact desktop card: stopped rows are yellow, failed rows and systemd load errors are red, and missing or unavailable rows stay neutral.
 - Native Start/Stop controls through asynchronous systemd D-Bus calls.
 - Argument-safe journal launching with configurable history in Cinnamon's configured terminal.
 
@@ -32,6 +32,8 @@ Right-click a service row for **Start** and **Stop**. The available action follo
 The Minecraft companion files live separately in `~/projects/games/minecraft/service` so the public Spice does not contain a machine-specific launcher path. Install that user service with the local installer in that directory, passing the directory that contains the `run.sh` targeted by your `minecraft-server` alias. Installation does not enable or start it at login; start it manually from the desklet or with `systemctl --user start minecraft-server.service` when wanted. Its stop handler sends the Minecraft `stop` console command and waits for the server to exit so the world can save; after 120 seconds, systemd hard-kills any remaining service processes as the final fallback.
 
 The first completed check, including the first check after changing the watchlist, establishes a silent baseline. If a running service later becomes failed, stopped, or missing, the desklet sends one notification; it sends one more when that service recovers. Query errors appear as **Unavailable** without creating a failure or recovery alert.
+
+Stopped rows render yellow, failed rows and systemd load errors render red, and missing or unavailable rows remain neutral. Text still carries the state meaning, so the color is a cue rather than the only signal.
 
 Selecting a service opens its journal and follows new entries. **Journal history lines** defaults to 1,000 and accepts values from 1 through 100,000. Changes apply the next time a service row is selected; they do not alter an already-open journal terminal.
 

@@ -47,9 +47,9 @@ test("AC3 classifies every supported systemd state", () => {
         [tuple("reload.service", "loaded", "reloading", "reload"), "transitional", "Reloading"],
         [tuple("stopping.service", "loaded", "deactivating", "stop"), "transitional", "Stopping"],
         [tuple("failed.service", "loaded", "failed", "failed"), "unhealthy", "Failed"],
-        [tuple("stopped.service", "loaded", "inactive", "dead"), "unhealthy", "Stopped"],
+        [tuple("stopped.service", "loaded", "inactive", "dead"), "stopped", "Stopped"],
         [tuple("missing.service", "not-found", "inactive", "dead"), "missing", "Not found"],
-        [tuple("error.service", "error", "active", "running"), "unknown", "Unavailable"],
+        [tuple("error.service", "error", "active", "running"), "errored", "Unavailable"],
         [tuple("masked.service", "masked", "inactive", "dead"), "unknown", "Unavailable"],
         [null, "unknown", "Unavailable"],
         [["malformed"], "unknown", "Unavailable"]
@@ -191,6 +191,32 @@ test("AC6 ignores transitional and unknown states without losing stable history"
     assert.deepEqual(
         tracker.update([{key, state: {kind: "healthy"}}]),
         [{key, type: "recovery", from: "unhealthy", to: "healthy"}]
+    );
+});
+
+test("AC3 treats stopped and errored states as failure transitions", () => {
+    const key = "system:demo.service";
+    const tracker = new state.TransitionTracker();
+
+    tracker.update([{key, state: {kind: "healthy"}}]);
+    assert.deepEqual(
+        tracker.update([{key, state: {kind: "stopped"}}]),
+        [{key, type: "failure", from: "healthy", to: "stopped"}]
+    );
+    assert.deepEqual(
+        tracker.update([{key, state: {kind: "healthy"}}]),
+        [{key, type: "recovery", from: "stopped", to: "healthy"}]
+    );
+
+    const erroredTracker = new state.TransitionTracker();
+    erroredTracker.update([{key, state: {kind: "healthy"}}]);
+    assert.deepEqual(
+        erroredTracker.update([{key, state: {kind: "errored"}}]),
+        [{key, type: "failure", from: "healthy", to: "errored"}]
+    );
+    assert.deepEqual(
+        erroredTracker.update([{key, state: {kind: "healthy"}}]),
+        [{key, type: "recovery", from: "errored", to: "healthy"}]
     );
 });
 

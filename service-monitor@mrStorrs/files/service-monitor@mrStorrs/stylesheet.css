@@ -60,15 +60,17 @@
     color: #4ade80;
 }
 
-.service-monitor-transitional {
+.service-monitor-transitional,
+.service-monitor-stopped {
     color: #facc15;
 }
 
 .service-monitor-unhealthy,
-.service-monitor-missing {
+.service-monitor-errored {
     color: #fb7185;
 }
 
+.service-monitor-missing,
 .service-monitor-unknown {
     color: #a3a3a3;
 }
