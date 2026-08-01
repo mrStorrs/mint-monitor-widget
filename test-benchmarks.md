@@ -6,4 +6,4 @@ Recommended timeout is the larger of twice the last runtime or 30 seconds.
 
 | Command | Last Run Time | Last Updated | Recommended Timeout | Notes |
 |---|---|---|---|---|
-| `make check` | 0.37s | 2026-07-24 | 30s | Cinnamon runtime behavior also has a manual desktop gate. |
+| `make check` | 0.29s | 2026-08-01 | 30s | Cinnamon runtime behavior also has a manual desktop gate. |
