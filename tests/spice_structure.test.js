@@ -497,6 +497,139 @@ test("service actions use validated D-Bus method names and replace mode", () => 
     );
 });
 
+test("service menu defers refresh rendering until its close animation finishes", () => {
+    const gate = new desklet.ServiceMenuRenderGate();
+    const menu = {};
+    const firstView = {kind: "services", revision: 1};
+    const latestView = {kind: "services", revision: 2};
+
+    gate.open(menu);
+    assert.equal(gate.defer(firstView), true);
+
+    assert.equal(gate.defer(latestView), true);
+    assert.equal(gate.finish({}), null);
+    assert.equal(gate.defer({kind: "services", revision: 3}), true);
+
+    assert.deepEqual(
+        gate.finish(menu),
+        {kind: "services", revision: 3}
+    );
+    assert.equal(gate.defer({kind: "services", revision: 4}), false);
+
+    const source = fs.readFileSync(DESKLET_PATH, "utf8");
+    assert.match(source, /menu\.connect\("menu-animated-closed"/);
+});
+
+test("service row context menus stay isolated from the built-in desklet menu", () => {
+    const child = {};
+    const unrelated = {};
+    const rowButton = {
+        contains: source => source === child
+    };
+
+    assert.equal(
+        desklet.isServiceRowEventSource(new Set([rowButton]), child),
+        true
+    );
+    assert.equal(
+        desklet.isServiceRowEventSource(new Set([rowButton]), unrelated),
+        false
+    );
+
+    const source = fs.readFileSync(DESKLET_PATH, "utf8");
+    assert.match(source, /new PopupMenu\.PopupMenuManager\(this\)/);
+    assert.doesNotMatch(source, /this\._menuManager\.addMenu\(menu\)/);
+    assert.match(source, /_onButtonReleaseEvent\(actor, event\)/);
+});
+
+test("single-instance settings migrate before initialization and contain copy errors", () => {
+    const migrationOperations = [];
+    const migrationResult = desklet.initializeSingleInstanceSettings(UUID, 0, {
+        exists: filename => {
+            migrationOperations.push(["exists", filename]);
+            return filename === "0.json";
+        },
+        copy: (source, destination) => {
+            migrationOperations.push(["copy", source, destination]);
+        },
+        report: error => assert.fail(error),
+        initialize: () => {
+            migrationOperations.push(["initialize"]);
+            return "settings";
+        }
+    });
+
+    assert.equal(migrationResult, "settings");
+    assert.deepEqual(migrationOperations, [
+        ["exists", `${UUID}.json`],
+        ["exists", "0.json"],
+        ["copy", "0.json", `${UUID}.json`],
+        ["initialize"]
+    ]);
+
+    const failureOperations = [];
+    const copyError = new Error("copy failed");
+    const failureResult = desklet.initializeSingleInstanceSettings(UUID, 0, {
+        exists: () => true,
+        copy: () => {
+            failureOperations.push(["copy"]);
+            throw copyError;
+        },
+        report: error => failureOperations.push(["report", error]),
+        initialize: () => {
+            failureOperations.push(["initialize"]);
+            return "fallback settings";
+        }
+    });
+
+    assert.equal(failureResult, "fallback settings");
+    assert.deepEqual(failureOperations, [["initialize"]]);
+
+    let existenceChecks = 0;
+    const containedFailureResult = desklet.initializeSingleInstanceSettings(UUID, 0, {
+        exists: () => {
+            existenceChecks += 1;
+            return existenceChecks === 2;
+        },
+        copy: () => {
+            throw copyError;
+        },
+        report: error => failureOperations.push(["report", error]),
+        initialize: () => {
+            failureOperations.push(["initialize after error"]);
+            return "recovered settings";
+        }
+    });
+
+    assert.equal(containedFailureResult, "recovered settings");
+    assert.deepEqual(failureOperations, [
+        ["initialize"],
+        ["report", copyError],
+        ["initialize after error"]
+    ]);
+
+    const firstInstallOperations = [];
+    const firstInstallResult = desklet.initializeSingleInstanceSettings(UUID, 0, {
+        exists: filename => {
+            firstInstallOperations.push(["exists", filename]);
+            return false;
+        },
+        copy: () => assert.fail("first install must not copy settings"),
+        report: error => assert.fail(error),
+        initialize: () => {
+            firstInstallOperations.push(["initialize"]);
+            return "new settings";
+        }
+    });
+
+    assert.equal(firstInstallResult, "new settings");
+    assert.deepEqual(firstInstallOperations, [
+        ["exists", `${UUID}.json`],
+        ["exists", "0.json"],
+        ["initialize"]
+    ]);
+});
+
 test("service action orchestration covers scope, duplicates, errors, retry, and removal", async () => {
     const row = {
         key: "user:worker.service",
@@ -619,8 +752,8 @@ test("AC10 includes an upstream-shaped, internally consistent Spice payload", ()
     assert.equal(info.author, "mrStorrs");
     assert.equal(metadata.uuid, UUID);
     assert.equal(metadata.name, "Service Monitor");
-    assert.equal(metadata.version, 3);
-    assert.equal(metadata["max-instances"], 10);
+    assert.equal(metadata.version, 4);
+    assert.equal(metadata["max-instances"], 1);
     assert.deepEqual(settings.services.default, [
         {
             label: "Minecraft Server",
@@ -653,7 +786,7 @@ test("AC10 includes an upstream-shaped, internally consistent Spice payload", ()
         path.join(PAYLOAD, "po", `${UUID}.pot`),
         "utf8"
     );
-    assert.match(pot, /Project-Id-Version: service-monitor@mrStorrs 3/);
+    assert.match(pot, /Project-Id-Version: service-monitor@mrStorrs 4/);
     assert.match(pot, /msgid "Journal history lines"/);
     assert.match(pot, /msgid "lines"/);
     assert.match(pot, /msgid "Start"/);

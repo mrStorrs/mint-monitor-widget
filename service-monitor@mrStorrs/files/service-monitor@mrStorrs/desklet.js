@@ -48,6 +48,28 @@ function displayLabel(row) {
     return row.label;
 }
 
+function isServiceRowEventSource(rowButtons, source) {
+    for (const button of rowButtons) {
+        if (button === source || button.contains(source))
+            return true;
+    }
+    return false;
+}
+
+function initializeSingleInstanceSettings(uuid, instanceId, adapters) {
+    const canonicalFilename = `${uuid}.json`;
+    const legacyFilename = `${instanceId}.json`;
+
+    try {
+        if (!adapters.exists(canonicalFilename) && adapters.exists(legacyFilename))
+            adapters.copy(legacyFilename, canonicalFilename);
+    } catch (error) {
+        adapters.report(error);
+    }
+
+    return adapters.initialize();
+}
+
 class ServiceMonitorCore {
     constructor(adapters) {
         this._query = adapters.query;
@@ -226,6 +248,40 @@ class ServiceMonitorCore {
     }
 }
 
+class ServiceMenuRenderGate {
+    constructor() {
+        this._menu = null;
+        this._pendingView = null;
+    }
+
+    open(menu) {
+        this._menu = menu;
+    }
+
+    defer(view) {
+        if (!this._menu)
+            return false;
+
+        this._pendingView = view;
+        return true;
+    }
+
+    finish(menu) {
+        if (this._menu !== menu)
+            return null;
+
+        this._menu = null;
+        const pendingView = this._pendingView;
+        this._pendingView = null;
+        return pendingView;
+    }
+
+    reset() {
+        this._menu = null;
+        this._pendingView = null;
+    }
+}
+
 function runServiceAction(row, action, adapters) {
     if (adapters.removed() || adapters.inFlight.has(row.key))
         return Promise.resolve(false);
@@ -393,10 +449,10 @@ if (!IS_NODE) {
             this._managerProxies = {system: null, user: null};
             this._cancellable = new Gio.Cancellable();
             this._rowMenus = new Set();
+            this._serviceRowButtons = new Set();
             this._actionInFlight = new Set();
             this._removed = false;
-            this._openMenu = null;
-            this._pendingView = null;
+            this._menuRenderGate = new ServiceMenuRenderGate();
             this._terminalSettings = new Gio.Settings({
                 schema_id: "org.cinnamon.desktop.default-applications.terminal"
             });
@@ -416,10 +472,36 @@ if (!IS_NODE) {
             this.setContent(this._card);
             this.setHeader(translate("Service Monitor"));
 
-            this._settings = new Settings.DeskletSettings(
-                this,
+            const configDirectory = GLib.build_filenamev([
+                GLib.get_user_config_dir(),
+                "cinnamon",
+                "spices",
+                metadata.uuid
+            ]);
+            this._settings = initializeSingleInstanceSettings(
                 metadata.uuid,
-                deskletId
+                deskletId,
+                {
+                    exists: filename => Gio.File.new_for_path(
+                        GLib.build_filenamev([configDirectory, filename])
+                    ).query_exists(null),
+                    copy: (sourceFilename, destinationFilename) => Gio.File.new_for_path(
+                        GLib.build_filenamev([configDirectory, sourceFilename])
+                    ).copy(
+                        Gio.File.new_for_path(
+                            GLib.build_filenamev([configDirectory, destinationFilename])
+                        ),
+                        Gio.FileCopyFlags.NONE,
+                        null,
+                        null
+                    ),
+                    report: error => global.logError(error),
+                    initialize: () => new Settings.DeskletSettings(
+                        this,
+                        metadata.uuid,
+                        deskletId
+                    )
+                }
             );
             this._settings.bind(
                 "services",
@@ -469,6 +551,18 @@ if (!IS_NODE) {
             this._active = true;
             this._core.refresh();
             this._restartTimer();
+        }
+
+        _onButtonReleaseEvent(actor, event) {
+            if (event.get_button() === Clutter.BUTTON_SECONDARY
+                && isServiceRowEventSource(
+                    this._serviceRowButtons,
+                    event.get_source()
+                )) {
+                return Clutter.EVENT_STOP;
+            }
+
+            return super._onButtonReleaseEvent(actor, event);
         }
 
         on_desklet_removed() {
@@ -597,12 +691,9 @@ if (!IS_NODE) {
         }
 
         _render(view) {
-            if (this._openMenu) {
-                this._pendingView = view;
+            if (this._menuRenderGate.defer(view))
                 return;
-            }
 
-            this._pendingView = null;
             this._destroyRowMenus();
             for (const child of this._card.get_children())
                 child.destroy();
@@ -679,6 +770,7 @@ if (!IS_NODE) {
                     displayLabel(row)
                 )
             });
+            this._serviceRowButtons.add(button);
             let menu = null;
             button.connect("clicked", () => this._openJournal(row));
             button.connect("button-release-event", (actor, event) => {
@@ -715,25 +807,21 @@ if (!IS_NODE) {
             menu.addMenuItem(startItem);
             menu.addMenuItem(stopItem);
             menu._serviceItems = {start: startItem, stop: stopItem};
-            this._menuManager.addMenu(menu);
+            const menuManager = new PopupMenu.PopupMenuManager(this);
+            menuManager.addMenu(menu);
+            menu._serviceMenuManager = menuManager;
             Main.uiGroup.add_actor(menu.actor);
             menu.actor.hide();
             this._rowMenus.add(menu);
 
             menu.connect("open-state-changed", (actor, open) => {
-                if (open) {
-                    this._openMenu = menu;
-                    return;
-                }
-
-                if (this._openMenu !== menu)
-                    return;
-                this._openMenu = null;
-                if (!this._removed && this._pendingView) {
-                    const pendingView = this._pendingView;
-                    this._pendingView = null;
+                if (open)
+                    this._menuRenderGate.open(menu);
+            });
+            menu.connect("menu-animated-closed", () => {
+                const pendingView = this._menuRenderGate.finish(menu);
+                if (!this._removed && pendingView)
                     this._render(pendingView);
-                }
             });
 
             startItem.connect("activate", () => {
@@ -780,14 +868,14 @@ if (!IS_NODE) {
         }
 
         _destroyRowMenus() {
-            this._pendingView = null;
+            this._menuRenderGate.reset();
             for (const menu of this._rowMenus) {
                 if (menu.isOpen)
                     menu.close(false);
                 menu.destroy();
             }
             this._rowMenus.clear();
-            this._openMenu = null;
+            this._serviceRowButtons.clear();
         }
 
         _statusGlyph(kind) {
@@ -893,6 +981,9 @@ function main(metadata, deskletId) {
 
 module.exports = {
     ServiceMonitorCore,
+    ServiceMenuRenderGate,
+    initializeSingleInstanceSettings,
+    isServiceRowEventSource,
     launchJournal,
     runServiceAction,
     serviceActionRequest,
